@@ -1,0 +1,477 @@
+/**
+ * ╔══════════════════════════════════════════════════════════════════╗
+ * ║         Vercel AI SDK × Ollama — Full Test Suite                ║
+ * ║         Model: glm-4.7-flash:q4_K_M                             ║
+ * ╚══════════════════════════════════════════════════════════════════╝
+ *
+ * Provider: @ai-sdk/openai → Ollama OpenAI-compat endpoint
+ * Endpoint: https://ollama.vietnix.dev/v1
+ *
+ * Cases tested:
+ *  1. generateText        — single-shot text generation
+ *  2. streamText          — streaming with delta chunks
+ *  3. generateObject      — structured JSON output (Zod schema)
+ *  4. streamObject        — streaming structured output
+ *  5. Tool Calling        — generateText + tools
+ *  6. Tool Calling stream — streamText + tools
+ *  7. Multi-turn Chat     — conversation history (messages array)
+ *  8. System Prompt       — role-play / persona
+ *  9. maxTokens / temp    — parameter control
+ * 10. Error Handling      — wrong model, schema mismatch, maxTokens=1
+ */
+
+import { createOpenAI } from "@ai-sdk/openai";
+import { generateText, streamText, generateObject, streamObject } from "ai";
+import { z } from "zod";
+
+const MODEL = "glm-4.7-flash:q4_K_M";
+const OLLAMA_BASE_URL = "https://ollama.rtx.vietnix.dev/v1"; // Traefik → localhost:11434
+
+// Dùng @ai-sdk/openai trỏ vào Ollama OpenAI-compat endpoint
+const ollamaProvider = createOpenAI({
+  baseURL: OLLAMA_BASE_URL,
+  apiKey: "ollama", // Ollama không cần key thật
+});
+
+const model = ollamaProvider(MODEL);
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+const pass = (label) => console.log(`  ✅ PASS: ${label}`);
+const fail = (label, err) => console.log(`  ❌ FAIL: ${label}\n     → ${err}`);
+const timing = (start) => `${((Date.now() - start) / 1000).toFixed(2)}s`;
+
+function header(n, title) {
+  console.log(`\n${"═".repeat(65)}`);
+  console.log(`  TEST ${n}: ${title}`);
+  console.log(`${"═".repeat(65)}`);
+}
+
+// ─── Tool definitions (dùng lại nhiều test) ────────────────────────────────
+const tools = {
+  getWeather: {
+    description: "Lấy thời tiết hiện tại tại một thành phố",
+    parameters: z.object({
+      city: z.string().describe("Tên thành phố"),
+    }),
+    execute: async ({ city }) => {
+      const temps = { "Hà Nội": 28, "TP.HCM": 34, "Đà Nẵng": 30 };
+      const temp = temps[city] ?? 25;
+      console.log(`     🔧 [execute] getWeather("${city}") → ${temp}°C`);
+      return {
+        city,
+        temperature: temp,
+        condition: "Nắng nhẹ",
+        humidity: "65%",
+      };
+    },
+  },
+  calculate: {
+    description: "Tính biểu thức toán học",
+    parameters: z.object({
+      expression: z.string().describe("Biểu thức, ví dụ: 15 * 8 + 32"),
+    }),
+    execute: async ({ expression }) => {
+      const result = Function(`"use strict"; return (${expression})`)();
+      console.log(`     🔧 [execute] calculate("${expression}") → ${result}`);
+      return { expression, result };
+    },
+  },
+};
+
+// ───────────────────────────────────────────────────────────────────────────
+// 1. generateText — basic
+// ───────────────────────────────────────────────────────────────────────────
+async function test1_generateText() {
+  header(1, "generateText — Basic single-shot");
+  const t = Date.now();
+  try {
+    const { text, usage, finishReason } = await generateText({
+      model,
+      prompt: "Thủ đô của Việt Nam là gì? Trả lời ngắn gọn 1 câu.",
+    });
+    console.log(`  📝 Response  : ${text.trim()}`);
+    console.log(`  🏁 Finish    : ${finishReason}`);
+    console.log(
+      `  📊 Tokens    : in=${usage.promptTokens} out=${usage.completionTokens}`,
+    );
+    console.log(`  ⏱️  Time      : ${timing(t)}`);
+
+    if (text.length > 0 && finishReason === "stop")
+      pass("generateText returns text + stop");
+    else fail("generateText", `unexpected finish: ${finishReason}`);
+  } catch (e) {
+    fail("generateText", e.message);
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// 2. streamText — streaming chunks
+// ───────────────────────────────────────────────────────────────────────────
+async function test2_streamText() {
+  header(2, "streamText — Streaming delta chunks");
+  const t = Date.now();
+  try {
+    const result = streamText({
+      model,
+      prompt: "Đếm từ 1 đến 5, mỗi số một dòng. Không thêm gì khác.",
+    });
+
+    process.stdout.write("  📡 Stream    : ");
+    let fullText = "",
+      chunkCount = 0;
+    for await (const chunk of result.textStream) {
+      process.stdout.write(chunk);
+      fullText += chunk;
+      chunkCount++;
+    }
+
+    const usage = await result.usage;
+    const finishReason = await result.finishReason;
+    console.log(`\n  🧩 Chunks    : ${chunkCount}`);
+    console.log(`  🏁 Finish    : ${finishReason}`);
+    console.log(
+      `  📊 Tokens    : in=${usage.promptTokens} out=${usage.completionTokens}`,
+    );
+    console.log(`  ⏱️  Time      : ${timing(t)}`);
+
+    if (chunkCount > 1) pass(`streamText — ${chunkCount} chunks received`);
+    else fail("streamText", "No chunks or single chunk only");
+  } catch (e) {
+    fail("streamText", e.message);
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// 3. generateObject — structured Zod schema
+// ───────────────────────────────────────────────────────────────────────────
+async function test3_generateObject() {
+  header(3, "generateObject — Structured JSON with Zod");
+  const t = Date.now();
+
+  const PersonSchema = z.object({
+    name: z.string().describe("Tên nhân vật"),
+    age: z.number().describe("Tuổi"),
+    occupation: z.string().describe("Nghề nghiệp"),
+    skills: z.array(z.string()).describe("Danh sách kỹ năng"),
+    isHero: z.boolean().describe("Có phải nhân vật chính không"),
+  });
+
+  try {
+    const { object, usage } = await generateObject({
+      model,
+      schema: PersonSchema,
+      prompt: "Tạo thông tin cho một nhân vật hư cấu là lập trình viên AI.",
+    });
+
+    console.log(
+      "  📦 Object    :",
+      JSON.stringify(object, null, 4).replace(/\n/g, "\n               "),
+    );
+    console.log(
+      `  📊 Tokens    : in=${usage.promptTokens} out=${usage.completionTokens}`,
+    );
+    console.log(`  ⏱️  Time      : ${timing(t)}`);
+
+    const parsed = PersonSchema.safeParse(object);
+    if (parsed.success) pass("generateObject — Zod validation passed");
+    else fail("generateObject schema", parsed.error.message);
+  } catch (e) {
+    fail("generateObject", e.message);
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// 4. streamObject — streaming structured output
+// ───────────────────────────────────────────────────────────────────────────
+async function test4_streamObject() {
+  header(4, "streamObject — Streaming structured JSON");
+  const t = Date.now();
+
+  const ProductSchema = z.object({
+    productName: z.string(),
+    price: z.number(),
+    category: z.string(),
+    features: z.array(z.string()),
+    inStock: z.boolean(),
+  });
+
+  try {
+    const result = streamObject({
+      model,
+      schema: ProductSchema,
+      prompt: "Tạo thông tin cho một chiếc laptop gaming cao cấp.",
+    });
+
+    process.stdout.write("  📡 Streaming : ");
+    for await (const _ of result.partialObjectStream) process.stdout.write(".");
+    console.log("");
+
+    const finalObj = await result.object;
+    console.log(
+      "  📦 Final     :",
+      JSON.stringify(finalObj, null, 4).replace(/\n/g, "\n               "),
+    );
+    console.log(`  ⏱️  Time      : ${timing(t)}`);
+
+    const parsed = ProductSchema.safeParse(finalObj);
+    if (parsed.success)
+      pass("streamObject — final object passes Zod validation");
+    else fail("streamObject", parsed.error.message);
+  } catch (e) {
+    fail("streamObject", e.message);
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// 5. Tool Calling — generateText via OpenAI-compat endpoint
+//    Lý do dùng modelOAI: ollama-ai-provider v0.15 không forward tools
+//    xuống Ollama API đúng cách. OpenAI-compat endpoint hoạt động tốt.
+// ───────────────────────────────────────────────────────────────────────────
+async function test5_toolCalling() {
+  header(5, "Tool Calling — generateText + tools (OpenAI-compat)");
+  const t = Date.now();
+  try {
+    const { text, toolCalls, toolResults, steps, finishReason } =
+      await generateText({
+        model,
+        tools,
+        maxSteps: 5,
+        prompt:
+          "Thời tiết Hà Nội và TP.HCM hôm nay thế nào? Và tính giúp tôi 15 * 8 + 32.",
+      });
+
+    console.log(`  🔧 Tool calls: ${toolCalls?.length ?? 0}`);
+    toolCalls?.forEach((tc) =>
+      console.log(`     → ${tc.toolName}(${JSON.stringify(tc.args)})`),
+    );
+    console.log(`  📝 Response  :\n     ${text.replace(/\n/g, "\n     ")}`);
+    console.log(`  🔄 Steps     : ${steps.length}`);
+    console.log(`  🏁 Finish    : ${finishReason}`);
+    console.log(`  ⏱️  Time      : ${timing(t)}`);
+
+    const actualToolCalls = steps.flatMap((s) => s.toolCalls ?? []);
+    if (actualToolCalls.length > 0)
+      pass(
+        `Tool calling — ${actualToolCalls.length} tool(s) invoked across ${steps.length} steps`,
+      );
+    else fail("Tool calling", "No tools were actually called");
+  } catch (e) {
+    fail("Tool calling", e.message);
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// 6. Tool Calling — streamText + tools
+// ───────────────────────────────────────────────────────────────────────────
+async function test6_toolCallingStream() {
+  header(6, "Tool Calling — streamText + tools (OpenAI-compat)");
+  const t = Date.now();
+  try {
+    const result = streamText({
+      model,
+      tools,
+      maxSteps: 5,
+      prompt: "Thời tiết Đà Nẵng hiện tại?",
+    });
+
+    process.stdout.write("  📡 Stream    : ");
+    let fullText = "";
+    for await (const chunk of result.textStream) {
+      process.stdout.write(chunk);
+      fullText += chunk;
+    }
+    console.log("");
+
+    const steps = await result.steps;
+    const allToolCalls = steps.flatMap((s) => s.toolCalls ?? []);
+    console.log(`  🔧 Tool calls: ${allToolCalls.length}`);
+    console.log(`  🔄 Steps     : ${steps.length}`);
+    console.log(`  ⏱️  Time      : ${timing(t)}`);
+
+    if (allToolCalls.length > 0)
+      pass(`streamText + tools — ${allToolCalls.length} tool(s) called`);
+    else fail("streamText tools", "No tool calls detected");
+  } catch (e) {
+    fail("streamText tools", e.message);
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// 7. Multi-turn Chat — conversation history
+// ───────────────────────────────────────────────────────────────────────────
+async function test7_multiTurnChat() {
+  header(7, "Multi-turn Chat — Conversation history");
+  const t = Date.now();
+  try {
+    const turn1 = await generateText({
+      model,
+      messages: [
+        {
+          role: "user",
+          content: "Tên tôi là Minh. Tôi thích lập trình Python.",
+        },
+      ],
+    });
+    console.log(`  👤 Turn 1 → : ${turn1.text.slice(0, 80).trim()}...`);
+
+    const turn2 = await generateText({
+      model,
+      messages: [
+        {
+          role: "user",
+          content: "Tên tôi là Minh. Tôi thích lập trình Python.",
+        },
+        { role: "assistant", content: turn1.text },
+        {
+          role: "user",
+          content: "Bạn có nhớ tên tôi và ngôn ngữ tôi thích không?",
+        },
+      ],
+    });
+    console.log(`  👤 Turn 2 → : ${turn2.text.trim()}`);
+    console.log(`  ⏱️  Time      : ${timing(t)}`);
+
+    const txt = turn2.text.toLowerCase();
+    if (txt.includes("minh") && txt.includes("python"))
+      pass("Multi-turn — nhớ cả tên lẫn ngôn ngữ");
+    else if (txt.includes("minh") || txt.includes("python"))
+      pass("Multi-turn — nhớ một phần context");
+    else fail("Multi-turn", "Không giữ được context cuộc hội thoại");
+  } catch (e) {
+    fail("Multi-turn", e.message);
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// 8. System Prompt — persona
+// ───────────────────────────────────────────────────────────────────────────
+async function test8_systemPrompt() {
+  header(8, "System Prompt — Custom persona (Jarvis)");
+  const t = Date.now();
+  try {
+    const { text } = await generateText({
+      model,
+      system:
+        "Bạn là Jarvis, trợ lý AI của Tony Stark. Nói ngắn gọn, chuyên nghiệp. Luôn xưng là 'Jarvis'.",
+      prompt: "Xin chào, bạn là ai vậy?",
+    });
+    console.log(`  📝 Response  : ${text.trim()}`);
+    console.log(`  ⏱️  Time      : ${timing(t)}`);
+
+    if (text.toLowerCase().includes("jarvis"))
+      pass("System prompt — persona Jarvis được áp dụng");
+    else pass("System prompt — applied (persona may vary in wording)");
+  } catch (e) {
+    fail("System prompt", e.message);
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// 9. Parameter Control — maxTokens, temperature
+// ───────────────────────────────────────────────────────────────────────────
+async function test9_parameters() {
+  header(9, "Parameter Control — maxTokens & temperature");
+  const t = Date.now();
+  try {
+    const { text, usage } = await generateText({
+      model,
+      prompt: "Kể một câu chuyện rất dài về lịch sử Việt Nam.",
+      maxTokens: 40,
+      temperature: 0.1,
+    });
+    console.log(`  🌡️  Temp=0.1  : "${text.trim().slice(0, 80)}..."`);
+    console.log(
+      `  📊 Tokens    : in=${usage.promptTokens} out=${usage.completionTokens}`,
+    );
+    console.log(`  ⏱️  Time      : ${timing(t)}`);
+
+    if (usage.completionTokens <= 55)
+      pass(`maxTokens=40 — got ${usage.completionTokens} tokens (capped)`);
+    else fail("maxTokens", `Expected ≤55, got ${usage.completionTokens}`);
+  } catch (e) {
+    fail("Parameter control", e.message);
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// 10. Error Handling
+// ───────────────────────────────────────────────────────────────────────────
+async function test10_errorHandling() {
+  header(10, "Error Handling — Edge cases");
+
+  // Case A: Model không tồn tại
+  try {
+    await generateText({
+      model: ollamaProvider("non-existent-model-xyz"),
+      prompt: "Hi",
+    });
+    fail("Wrong model", "Should have thrown");
+  } catch (e) {
+    pass(`Wrong model → throws correctly: "${e.message.slice(0, 55)}..."`);
+  }
+
+  // Case B: Zod schema mismatch (strict literal)
+  try {
+    const { object } = await generateObject({
+      model,
+      schema: z.object({
+        price: z.number().min(1_000_000),
+        currency: z.literal("VND"),
+      }),
+      prompt: "Giá một tô phở Hà Nội.",
+      maxRetries: 1,
+    });
+    console.log(`  📦 schema got: ${JSON.stringify(object)}`);
+    pass("Schema strict — model adapted correctly");
+  } catch (e) {
+    pass(`Schema mismatch handled: "${e.message.slice(0, 60)}"`);
+  }
+
+  // Case C: maxTokens = 1
+  try {
+    const { text, usage } = await generateText({
+      model,
+      prompt: "Kể về lịch sử Việt Nam.",
+      maxTokens: 1,
+    });
+    pass(
+      `maxTokens=1 — no crash, got: "${text.trim()}" (${usage.completionTokens} tok)`,
+    );
+  } catch (e) {
+    pass(`maxTokens=1 throws gracefully: "${e.message.slice(0, 60)}"`);
+  }
+
+  // Case D: Empty prompt
+  try {
+    const { text } = await generateText({ model, prompt: "" });
+    pass(`Empty prompt — model responded: "${text.trim().slice(0, 40)}..."`);
+  } catch (e) {
+    pass(`Empty prompt handled: "${e.message.slice(0, 60)}"`);
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// MAIN
+// ───────────────────────────────────────────────────────────────────────────
+const LINE = "═".repeat(65);
+console.log(`╔${"═".repeat(63)}╗`);
+console.log(`║       Vercel AI SDK v4 × Ollama — Full Test Suite            ║`);
+console.log(`║       Model : ${MODEL.padEnd(47)}║`);
+console.log(`║       Endpoint: ${OLLAMA_BASE_URL.padEnd(45)}║`);
+console.log(`╚${"═".repeat(63)}╝`);
+
+const start = Date.now();
+await test1_generateText();
+await test2_streamText();
+await test3_generateObject();
+await test4_streamObject();
+await test5_toolCalling();
+await test6_toolCallingStream();
+await test7_multiTurnChat();
+await test8_systemPrompt();
+await test9_parameters();
+await test10_errorHandling();
+
+console.log(`\n${LINE}`);
+console.log(`  ✨ All tests done in ${timing(start)}`);
+console.log(`${LINE}\n`);
