@@ -1,5 +1,3 @@
-"use server";
-
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, streamText, type ModelMessage } from "ai";
 
