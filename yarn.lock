@@ -146,6 +146,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@ant-design/nextjs-registry@npm:^1.3.0":
+  version: 1.3.0
+  resolution: "@ant-design/nextjs-registry@npm:1.3.0"
+  peerDependencies:
+    "@ant-design/cssinjs": ">=1.0.0"
+    antd: ">=5.0.0"
+    next: ">=14.0.0"
+    react: ">=16.0.0"
+    react-dom: ">=16.0.0"
+  checksum: 10c0/32b332a38d60064d100f092c937602dad15463058d18bcd32a992c896447bd83865fe354904a9777c4dfe8f0a6cfa72791f0a0db217e7aeb3f3ea508b0285f00
+  languageName: node
+  linkType: hard
+
 "@ant-design/react-slick@npm:~1.1.2":
   version: 1.1.2
   resolution: "@ant-design/react-slick@npm:1.1.2"
@@ -1638,6 +1651,7 @@ __metadata:
   dependencies:
     "@ai-sdk/openai": "npm:^3.0.48"
     "@ai-sdk/react": "npm:^3.0.140"
+    "@ant-design/nextjs-registry": "npm:^1.3.0"
     "@tailwindcss/postcss": "npm:^4"
     "@types/node": "npm:^20"
     "@types/react": "npm:^19"

@@ -15,12 +15,12 @@ const wordEntrySchema = z.object({
   meaning: z
     .string()
     .describe(
-      "Nghĩa tiếng Việt — giải thích hài hước kiểu Cô Lành, dùng **bold** cho từ khóa quan trọng (empty string if not English)",
+      "Nghĩa tiếng Việt — giải thích hài hước kiểu Cô Lành, dùng **bold** cho từ khóa quan trọng (empty string if not English).",
     ),
   example: z
     .string()
     .describe(
-      "Câu ví dụ tiếng Anh bựa, nhây. Dùng markdown: **bold** cho từ chính trong câu (empty string if not English)",
+      "Câu ví dụ BẮT BUỘC PHẢI LÀ TIẾNG ANH, không được là tiếng Việt. Bựa, nhây. Dùng markdown: **bold** cho từ chính trong câu (empty string if not English)",
     ),
   grammar_notes: z
     .string()
@@ -39,8 +39,8 @@ First, determine if the input is a valid English word. Set isEnglish accordingly
 
 When isEnglish is true, provide:
 1. The IPA phonetic transcription
-2. A Vietnamese meaning explained in your signature funny, witty style (accurate but entertaining)
-3. A bựa/nhây example sentence in English that uses the word
+2. A Vietnamese meaning explained in your signature funny, witty style (accurate but entertaining). But have to show the correct meaning in Vietnamese.
+3. A "bựa/nhây" example sentence MUST BE IN ENGLISH that uses the word
 4. Grammar notes related to the word (e.g. "Thường đi với giới từ 'on'", "Dạng quá khứ: went")
 5. Difficulty level: "easy", "medium", or "hard"
 

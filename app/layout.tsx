@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "antd/dist/reset.css";
+import { AntdRegistry } from "@ant-design/nextjs-registry";
 import Sidebar from "./components/Sidebar";
+import AuthGuard from "./components/AuthGuard";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,29 +32,33 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <div className="min-h-screen flex flex-col">
-          <header className="sticky top-0 z-10 border-b border-zinc-200 backdrop-blur">
-            <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white">
-                AI
-              </div>
-              <div className="leading-tight">
-                <div className="text-sm font-semibold text-zinc-900">
-                  AI Practice v2
+        <AntdRegistry>
+          <AuthGuard>
+            <div className="min-h-screen flex flex-col">
+              <header className="sticky top-0 z-10 border-b border-zinc-200 backdrop-blur">
+                <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-4">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white">
+                    AI
+                  </div>
+                  <div className="leading-tight">
+                    <div className="text-sm font-semibold text-zinc-900">
+                      AI Practice v2
+                    </div>
+                  </div>
                 </div>
+              </header>
+
+              <div className="mx-auto flex w-full max-w-6xl flex-1 min-h-0">
+                <Sidebar />
+                <main className="flex-1 min-w-0 p-4 md:p-6">
+                  <section className="mx-auto w-full max-w-6xl rounded-2xl border border-zinc-200 p-4 md:p-8 shadow-xs">
+                    {children}
+                  </section>
+                </main>
               </div>
             </div>
-          </header>
-
-          <div className="mx-auto flex w-full max-w-6xl flex-1 min-h-0">
-            <Sidebar />
-            <main className="flex-1 min-w-0 p-4 md:p-6">
-              <section className="mx-auto w-full max-w-6xl rounded-2xl border border-zinc-200 p-4 md:p-8 shadow-xs">
-                {children}
-              </section>
-            </main>
-          </div>
-        </div>
+          </AuthGuard>
+        </AntdRegistry>
       </body>
     </html>
   );

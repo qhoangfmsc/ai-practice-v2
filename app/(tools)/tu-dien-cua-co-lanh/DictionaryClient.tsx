@@ -26,7 +26,10 @@ export default function DictionaryClient() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<WordEntry | null>(null);
+  const [lastWord, setLastWord] = useState("");
   const [messageApi, contextHolder] = message.useMessage();
+
+  const isSameWord = lastWord !== "" && input.trim().toLowerCase() === lastWord;
 
   const validate = (value: string): string | null => {
     const trimmed = value.trim();
@@ -42,6 +45,7 @@ export default function DictionaryClient() {
       messageApi.warning(validationError);
       return;
     }
+
 
     setLoading(true);
     setResult(null);
@@ -60,6 +64,7 @@ export default function DictionaryClient() {
 
       const data: WordEntry = await res.json();
       setResult(data);
+      setLastWord(data.word.toLowerCase());
     } catch (err) {
       messageApi.error(
         err instanceof Error ? err.message : "Có lỗi xảy ra.",
@@ -90,7 +95,7 @@ export default function DictionaryClient() {
             size="large"
             htmlType="submit"
             loading={loading}
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || loading || isSameWord}
             className="!rounded-xl !px-6"
           >
             Tra từ
