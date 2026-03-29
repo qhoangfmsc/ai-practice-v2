@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateText, streamText, type ModelMessage } from "ai";
+import { generateText, smoothStream, streamText, type ModelMessage } from "ai";
 
 const OLLAMA_BASE_URL = "https://ollama.rtx.vietnix.dev/v1";
 const MODEL_ID = "glm-4.7-flash:q4_K_M";
@@ -37,8 +37,10 @@ export async function generateAIText(input: GenerateAITextInput) {
   };
 }
 
-export async function streamAIText(input: GenerateAITextInput) {
-  const { prompt, system, messages } = input;
+export async function streamAIText(
+  input: GenerateAITextInput & { isStream?: boolean },
+) {
+  const { prompt, system, messages, isStream } = input;
 
   // SDK yêu cầu: hoặc `prompt` hoặc `messages` (không dùng chung).
   const promptOrMessages = messages?.length
@@ -49,5 +51,8 @@ export async function streamAIText(input: GenerateAITextInput) {
     model,
     system,
     ...promptOrMessages,
+    ...(isStream && {
+      experimental_transform: smoothStream({ chunking: "word" }),
+    }),
   });
 }

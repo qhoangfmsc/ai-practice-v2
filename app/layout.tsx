@@ -31,7 +31,7 @@ export default function RootLayout({
     >
       <body className="min-h-full">
         <div className="min-h-screen flex flex-col">
-          <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur">
+          <header className="sticky top-0 z-10 border-b border-zinc-200 backdrop-blur">
             <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-4">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white">
                 AI
@@ -40,17 +40,14 @@ export default function RootLayout({
                 <div className="text-sm font-semibold text-zinc-900">
                   AI Practice v2
                 </div>
-                <div className="text-xs text-zinc-600">
-                  Tailwind + Ant Design demo
-                </div>
               </div>
             </div>
           </header>
 
-          <div className="mx-auto flex w-full max-w-6xl flex-1">
+          <div className="mx-auto flex w-full max-w-6xl flex-1 min-h-0">
             <Sidebar />
-            <main className="flex-1 h-[calc(100vh-120px)] overflow-auto p-6">
-              <section className="mx-auto h-full w-full max-w-6xl rounded-2xl border border-zinc-200 bg-white/70 p-8 shadow-xs">
+            <main className="flex-1 min-w-0 p-4 md:p-6">
+              <section className="mx-auto w-full max-w-6xl rounded-2xl border border-zinc-200 p-4 md:p-8 shadow-xs">
                 {children}
               </section>
             </main>

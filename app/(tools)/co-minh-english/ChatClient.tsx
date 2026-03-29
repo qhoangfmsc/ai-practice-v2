@@ -46,12 +46,10 @@ export default function ChatClient() {
   const endRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
 
-  // Memoize transport so useChat doesn't reinitialize on every render
   const transport = useMemo(
     () =>
       new TextStreamChatTransport({
         api: "/api/co-minh-english/chat",
-        // Send only the last 20 messages to the API
         prepareSendMessagesRequest: ({ messages }) => ({
           body: {
             messages: messages.slice(-20).map((m) => ({
@@ -68,14 +66,12 @@ export default function ChatClient() {
     transport,
   });
 
-  // Load persisted history on mount (client-only — avoids SSR localStorage error)
   useEffect(() => {
     const stored = loadMessages();
     if (stored.length > 0) setMessages(stored);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist to localStorage whenever messages change
   useEffect(() => {
     if (messages.length === 0) return;
     try {
@@ -88,7 +84,6 @@ export default function ChatClient() {
     }
   }, [messages]);
 
-  // Auto-scroll to the latest message
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, status]);
@@ -111,23 +106,10 @@ export default function ChatClient() {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        gap: 12,
-      }}
-    >
+    <div className="flex flex-col h-full gap-3">
       {/* Sub-header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <Text type="secondary" style={{ fontSize: 13 }}>
+      <div className="flex items-center justify-between">
+        <Text type="secondary" className="text-[13px]">
           Hoàng gửi câu · Cô Minh trả lời · tối đa 20 tin gần nhất
         </Text>
         <Button
@@ -140,79 +122,40 @@ export default function ChatClient() {
       </div>
 
       {/* Message area */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-          borderRadius: 16,
-          border: "1px solid #e5e7eb",
-          background: "rgba(255, 255, 255, 0.7)",
-          padding: 16,
-        }}
-      >
+      <div className="flex-1 min-h-0 overflow-y-auto rounded-2xl border border-zinc-200 bg-white/70 p-4">
         {messages.length === 0 && !isBusy ? (
-          <Text type="secondary" style={{ fontSize: 14 }}>
+          <Text type="secondary" className="text-sm">
             Hãy nói với Cô Minh thử một câu tiếng Anh nhé, Hoàng.
           </Text>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="flex flex-col gap-3">
             {messages.map((m) => {
               const text = getMessageText(m);
               return (
                 <div
                   key={m.id}
-                  style={{
-                    display: "flex",
-                    justifyContent:
-                      m.role === "user" ? "flex-end" : "flex-start",
-                    alignItems: "flex-start",
-                    gap: 8,
-                  }}
+                  className={`flex items-start gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   {m.role === "assistant" && (
                     <Avatar
                       size={32}
-                      style={{
-                        background: "#1677ff",
-                        flexShrink: 0,
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
+                      className="shrink-0 bg-blue-500 text-[13px] font-semibold"
                     >
                       M
                     </Avatar>
                   )}
 
                   <div
-                    style={{
-                      maxWidth: "85%",
-                      borderRadius: 16,
-                      padding: "10px 14px",
-                      background: m.role === "user" ? "#18181b" : "#ffffff",
-                      border:
-                        m.role === "assistant" ? "1px solid #e5e7eb" : "none",
-                      color: m.role === "user" ? "#fff" : "#18181b",
-                    }}
+                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${
+                      m.role === "user"
+                        ? "bg-zinc-900 text-white"
+                        : "bg-white border border-zinc-200 text-zinc-900"
+                    }`}
                   >
-                    <div
-                      style={{
-                        fontSize: 11,
-                        opacity: 0.55,
-                        marginBottom: 4,
-                        fontWeight: 500,
-                      }}
-                    >
+                    <div className="text-[11px] opacity-55 mb-1 font-medium">
                       {m.role === "user" ? "Hoàng" : "Cô Minh"}
                     </div>
-                    <div
-                      style={{
-                        fontSize: 14,
-                        lineHeight: 1.65,
-                        wordBreak: "break-word",
-                      }}
-                      className="markdown-body"
-                    >
+                    <div className="text-sm leading-relaxed break-words markdown-body">
                       {text ? (
                         <ReactMarkdown>{text}</ReactMarkdown>
                       ) : m.role === "assistant" ? (
@@ -224,12 +167,7 @@ export default function ChatClient() {
                   {m.role === "user" && (
                     <Avatar
                       size={32}
-                      style={{
-                        background: "#18181b",
-                        flexShrink: 0,
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
+                      className="shrink-0 bg-zinc-900 text-[13px] font-semibold"
                     >
                       H
                     </Avatar>
@@ -238,16 +176,11 @@ export default function ChatClient() {
               );
             })}
 
-            {/* Spinner shown while waiting for the first streaming token */}
             {status === "submitted" && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="flex items-center gap-2">
                 <Avatar
                   size={32}
-                  style={{
-                    background: "#1677ff",
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
+                  className="bg-blue-500 text-[13px] font-semibold"
                 >
                   M
                 </Avatar>
@@ -261,25 +194,21 @@ export default function ChatClient() {
 
       {/* Error */}
       {error && (
-        <Text type="danger" style={{ fontSize: 12 }}>
+        <Text type="danger" className="text-xs">
           {error.message}
         </Text>
       )}
 
       {/* Input */}
       <form onSubmit={handleSubmit}>
-        <Space.Compact style={{ width: "100%", alignItems: "flex-end" }}>
+        <Space.Compact className="w-full items-end">
           <Input.TextArea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Nhập tiếng Anh (hoặc pha tiếng Việt)…"
             disabled={isBusy}
             autoSize={{ minRows: 2, maxRows: 5 }}
-            style={{
-              borderRadius: "16px 0 0 16px",
-              fontSize: 14,
-              resize: "none",
-            }}
+            className="!rounded-l-2xl !rounded-r-none text-sm !resize-none"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -291,13 +220,7 @@ export default function ChatClient() {
             type="primary"
             htmlType="submit"
             disabled={isBusy || !input.trim()}
-            style={{
-              borderRadius: "0 16px 16px 0",
-              height: "auto",
-              alignSelf: "stretch",
-              padding: "0 20px",
-              fontSize: 14,
-            }}
+            className="!rounded-r-2xl !rounded-l-none !h-auto self-stretch !px-5 text-sm"
           >
             {isBusy ? "Đang…" : "Gửi"}
           </Button>

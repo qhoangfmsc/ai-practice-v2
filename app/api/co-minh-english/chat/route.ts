@@ -1,6 +1,8 @@
 import type { ModelMessage } from "ai";
 import { streamAIText } from "@/app/services/aiService";
 
+export const dynamic = "force-dynamic";
+
 const SYSTEM_PROMPT = `
 You are "Cô Minh", a friendly English teacher. Your student is Hoàng.
 Personality: sharp wit, light teasing — never offensive, always encouraging.
@@ -20,8 +22,12 @@ export async function POST(req: Request) {
       .slice(-20)
       .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-    const result = await streamAIText({ system: SYSTEM_PROMPT, messages: context });
-    return result.toTextStreamResponse();
+    const result = await streamAIText({ system: SYSTEM_PROMPT, messages: context, isStream: true });
+    return result.toTextStreamResponse({
+      headers: {
+        "X-Accel-Buffering": "no",
+      },
+    });
   } catch {
     return new Response("Invalid request.", { status: 400 });
   }

@@ -31,8 +31,8 @@ export default function Sidebar() {
     pathname && pathname !== "/" ? [pathname] : navItems[0] ? [navItems[0].key] : [];
 
   return (
-    <aside className="w-72 shrink-0 p-4">
-      <div className="h-full overflow-auto rounded-2xl bg-white/40 p-4 backdrop-blur">
+    <aside className="hidden md:block w-72 shrink-0 p-4">
+      <div className="h-full p-4">
         <div className="mb-3 text-lg font-semibold text-zinc-900">Menu</div>
         <Menu
           mode="inline"
