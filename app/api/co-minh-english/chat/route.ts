@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       .slice(-20)
       .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-    const result = await streamAIText({ system: SYSTEM_PROMPT, messages: context, isStream: true });
+    const result = await streamAIText({ system: SYSTEM_PROMPT, messages: context });
     return result.toTextStreamResponse({
       headers: {
         "X-Accel-Buffering": "no",

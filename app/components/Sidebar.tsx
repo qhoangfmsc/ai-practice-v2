@@ -12,7 +12,7 @@ const navItems: Array<{ key: string; href: string; label: string }> = [
     href: "/tu-dien-cua-co-lanh",
     label: "Từ điển của Cô Lành",
   },
-  { key: "/kieu-gia-xang", href: "/kieu-gia-xang", label: "Kiều Giá Xăng" },
+  { key: "/kieu-gia-xang", href: "/kieu-gia-xang", label: "Cô Kiều Giá Xăng" },
 ];
 
 export default function Sidebar() {

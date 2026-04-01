@@ -33,7 +33,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     const password = prompt("Mật khẩu:");
-    if (password !== "1234568") {
+    if (password !== "admin") {
       alert("Sai mật khẩu!");
       return;
     }
